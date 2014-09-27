@@ -1,8 +1,8 @@
 import Options.Applicative
 
-data Sample = Sample
-  { hello :: String
-  , quiet :: Bool }
+data Sample = Sample String Bool
+--  { hello :: String
+--  , quiet :: Bool }
 
 sample :: Parser Sample
 sample = Sample
@@ -23,5 +23,5 @@ main = execParser opts >>= greet
   where
     opts = info (helper <*> sample)
       ( fullDesc
-     <> progDesc "Print a greeting for TARGET"
-     <> header "hello - a test for optparse-applicative" )
+     <> progDesc "Invokes pants"
+     <> header "skirt - a wrapper around pants" )

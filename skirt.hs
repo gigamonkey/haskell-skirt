@@ -1,36 +1,43 @@
+import Options.Applicative
 import System.Directory
 
-magic = ".gitconfig" -- really should be "pants"
+data Invocation = Invocation String (Maybe String) String
+
+-- Set up command line args
+
+tldr = "skirt - a wrapper around pants"
+
+description = unlines [
+  "A wrapper around pants (or a way to circumvent using pants directly)",
+  "that provides a better user interface over the same slow and buggy code."]
+
+goal       = argument str (metavar "GOAL" <> help "The pants goal" <> value "compile" <> showDefault)
+target     = argument str (metavar "TARGET" <> help "The target (default: main target in current directory)")
+pants      = strOption (metavar "PANTS" <> help "Name of the Pants executable" <> long "pants" <> value "pants" <> showDefault)
+invocation = Invocation <$> goal <*> optional target <*> pants
+opts       = info (helper <*> invocation) (fullDesc <> progDesc description <> header tldr)
 
 -- Walk up the directory tree from where we are executed to find the root.
 
-findFileUp :: String -> String -> IO (Maybe (FilePath, FilePath))
-findFileUp s f = do
+lookUp :: String -> String -> IO (Maybe FilePath)
+lookUp s f = do
   exists <- doesFileExist f
   pwd    <- getCurrentDirectory
   if exists then
-      return (Just (pwd, (drop ((length pwd) + 1) s)))
+      return (Just (drop (length pwd + 1) s))
   else do
     setCurrentDirectory ".."
     up <- getCurrentDirectory
-    if up == pwd then return Nothing else findFileUp s f
+    if up == pwd then return Nothing else lookUp s f
 
--- Basic structure:
-
--- skirt [<goal>] [<target>] => ./pants goal <goal> <target> <path to current location>:<target>
--- goal defaults to 'compile'
--- target defaults to no target so we get the default target for the BUILD file via pants's defaulting mechanism.
-
--- Certain goals can trigger rewriting of the path (e.g. the test goal uses the test path corresponding to the current path.) or adding options.
-
--- skirt help <goal>: emit help messages specific to the given goal, including any options available with that goal.
-
--- skirt => ./pants goal compile <path>
--- skirt test ./pants goal test <testpath>
--- skirt
-
-
-main = do
+invoke :: Invocation -> IO ()
+invoke (Invocation goal target pants) = do
+  putStrLn $ "Goal: " ++ show goal
+  putStrLn $ "Target: " ++ show target
+  putStrLn $ "Pants: " ++ pants
   pwd <- getCurrentDirectory
-  root <- findFileUp pwd magic
-  putStrLn $ show root
+  root <- lookUp pwd pants
+  print ("./" ++ pants ++ " goal " ++ show root)
+
+
+main = execParser opts >>= invoke

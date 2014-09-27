@@ -1,6 +1,7 @@
 import Options.Applicative
 import System.Directory
 import System.Exit
+import System.FilePath
 
 data Invocation = Invocation String (Maybe String) String
 
@@ -18,25 +19,16 @@ target     = argument str (metavar "TARGET" <> help "The target (default: main t
 pants      = strOption (metavar "PANTS" <> help "Name of the Pants executable" <> long "pants" <> value "pants" <> showDefault)
 opts       = info (helper <*> invocation) (fullDesc <> progDesc description <> header tldr)
 
--- File system walking: we walk up the directory structure from where
--- skirt was invoked to find the root where the pants executable lives.
+main = execParser opts >>= invoke
 
-findRoot s f = do
-  exists <- doesFileExist f
-  pwd    <- getCurrentDirectory
-  if exists then
-      return (Just pwd)
-  else do
-    setCurrentDirectory ".."
-    up <- getCurrentDirectory
-    if up == pwd then return Nothing else findRoot s f
-
--- The default target given that we started in `start' and found pants in `root'.
+-- Basic deal is we walk up from the directory where skirt was invoked
+-- until we find the pants executable. The path from where pants lives
+-- to where we were invoked tells us the default target to use.
 
 invoke :: Invocation -> IO ()
 invoke (Invocation goal target pants) = do
   here <- getCurrentDirectory
-  root <- findRoot here pants -- N.B. this also cd's us up to the root
+  root <- findRoot (dirs here) pants
   doIt root here
       where doIt Nothing _ = do
 	      putStrLn "No pants! Better hope this is a bad dream."
@@ -44,14 +36,24 @@ invoke (Invocation goal target pants) = do
 
 	    doIt (Just r) h = do
 	      -- TODO: obviously at some point this will exec pants instead of just the command.
-	      putStrLn $ pantsInvocation pants goal target (pathToHere r h)
+	      setCurrentDirectory r
+	      putStrLn $ pantsCommand pants goal target (pathToHere r h)
 	      exitSuccess
 
-pantsInvocation pants goal target path = "./" ++ pants ++ " goal " ++ goal ++ " " ++ fullTarget target path
+-- Filename manipulations
 
-fullTarget (Just t) path = path ++ ":" ++ t
-fullTarget Nothing path  = path
+findRoot [] _ = return Nothing
+findRoot (d : ds) f = do
+  exists <- doesFileExist (combine d f)
+  if exists then return (Just d) else findRoot ds f
 
 pathToHere root = drop (length root + 1)
 
-main = execParser opts >>= invoke
+dirs d = if up == d then [d] else d : dirs up where up = takeDirectory d
+
+-- Pants command computation
+
+pantsCommand pants goal target path = "./" ++ pants ++ " goal " ++ goal ++ " " ++ fullTarget target path
+
+fullTarget (Just t) path = path ++ ":" ++ t
+fullTarget Nothing path  = path

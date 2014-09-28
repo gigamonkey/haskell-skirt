@@ -46,11 +46,11 @@ invoke (Invocation goal target pants) = do
   runPants root here
       where
 	runPants Nothing _ = do
-	  putStrLn "No pants! Better hope this is a bad dream."
+	  putStrLn "No pants! People are pointing and laughing. Maybe it's a bad dream."
 	  exitFailure
 	runPants (Just root) here = do
 	  setCurrentDirectory root
-	  code <- rawSystem "./pants" ("goal" : translate goal : computeTarget goal (pathToHere root here) target)
+	  code <- rawSystem ("./" ++ pants) ("goal" : translate goal : computeTarget goal (pathToHere root here) target)
 	  exitWith code
 
 -- Filename manipulations

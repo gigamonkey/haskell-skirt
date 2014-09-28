@@ -48,10 +48,13 @@ invoke (Invocation goal target pants) = do
 	runPants Nothing _ = do
 	  putStrLn "No pants! People are pointing and laughing. Maybe it's a bad dream."
 	  exitFailure
+
 	runPants (Just root) here = do
 	  setCurrentDirectory root
-	  code <- rawSystem ("./" ++ pants) ("goal" : translate goal : computeTarget goal (pathToHere root here) target)
-	  exitWith code
+	  rawSystem command args >>= exitWith
+	    where
+	      command = ("./" ++ pants)
+	      args    = "goal" : translate goal : computeTarget goal (makeRelative root here) target
 
 -- Filename manipulations
 
@@ -60,20 +63,19 @@ findRoot (d : ds) f = do
   exists <- doesFileExist (combine d f)
   if exists then return (Just d) else findRoot ds f
 
-pathToHere root = drop (length root + 1)
-
 dirs d = if up == d then [d] else d : dirs up where up = takeDirectory d
-
--- Pants command computation
-
-computeTarget "clean" _ _        = []
-computeTarget "test" path target = [ testPath path ++ fullTarget target ]
-computeTarget _ path target      = [ path ++ fullTarget target ]
-
-fullTarget t = fromMaybe "" $ (\s -> ":" ++ s) <$> t
-testPath p = if isPrefixOf "src/" p then "tests/" ++ drop (length "src/") p else p
 
 -- We translate certain goals from their pants name to something nicer.
 
 translate "clean" = "clean-all"
-translate x = x
+translate g = g
+
+-- Pants command computation
+
+computeTarget "clean" _ _        = []
+computeTarget "test" path target = [ fullTarget (testPath path) target ]
+computeTarget _ path target      = [ fullTarget path target ]
+
+fullTarget p t = fromMaybe p $ (\s -> p ++ ":" ++ s) <$> t
+
+testPath p = if isPrefixOf "src/" p then "tests/" ++ drop (length "src/") p else p

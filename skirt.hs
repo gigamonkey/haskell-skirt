@@ -42,7 +42,7 @@ main = execParser opts >>= invoke
 invoke :: Invocation -> IO ()
 invoke (Invocation goal target pants) = do
   here <- getCurrentDirectory
-  root <- findRoot (dirs here) pants
+  root <- findRoot here pants
   runPants root here
       where
 	runPants Nothing _ = do
@@ -53,15 +53,15 @@ invoke (Invocation goal target pants) = do
 	  setCurrentDirectory root
 	  rawSystem command args >>= exitWith
 	    where
-	      command = ("./" ++ pants)
+	      command = "./" ++ pants
 	      args    = "goal" : translate goal : computeTarget goal (makeRelative root here) target
 
 -- Filename manipulations
 
-findRoot [] _ = return Nothing
-findRoot (d : ds) f = do
-  exists <- doesFileExist (combine d f)
-  if exists then return (Just d) else findRoot ds f
+findRoot here f = firstM (\d -> doesFileExist $ combine d f) (dirs here)
+
+firstM _ [] = return Nothing
+firstM p (d:ds) = p d >>= \b -> if b then return (Just d) else firstM p ds
 
 dirs d = if up == d then [d] else d : dirs up where up = takeDirectory d
 
@@ -78,4 +78,4 @@ computeTarget _ path target      = [ fullTarget path target ]
 
 fullTarget p t = fromMaybe p $ (\s -> p ++ ":" ++ s) <$> t
 
-testPath p = if isPrefixOf "src/" p then "tests/" ++ drop (length "src/") p else p
+testPath p = if "src/" `isPrefixOf` p then "tests/" ++ drop (length "src/") p else p

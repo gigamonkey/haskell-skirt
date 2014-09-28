@@ -34,17 +34,17 @@ invoke (Invocation goal target pants) = do
   here <- getCurrentDirectory
   root <- findRoot here pants
   runPants root here
-      where
-	runPants Nothing _ = do
-	  putStrLn "No pants! People are pointing and laughing. Maybe it's a bad dream."
-	  exitFailure
+    where
+      runPants Nothing _ = do
+	putStrLn "No pants! People are pointing and laughing. Maybe it's a bad dream."
+	exitFailure
 
-	runPants (Just root) here = do
-	  setCurrentDirectory root
-	  rawSystem command args >>= exitWith
-	    where
-	      command = "./" ++ pants
-	      args    = "goal" : translate goal : computeTarget goal (makeRelative root here) target
+      runPants (Just root) here = do
+	setCurrentDirectory root
+	rawSystem command args >>= exitWith
+	  where
+	    command = "./" ++ pants
+	    args    = "goal" : translate goal : computeTarget goal (makeRelative root here) target
 
 -- Filename manipulations
 

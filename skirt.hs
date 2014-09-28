@@ -30,15 +30,6 @@ opts       = info (helper <*> invocation) (fullDesc <> progDesc description <> h
 
 main = execParser opts >>= invoke
 
--- Basic deal is we walk up from the directory where skirt was invoked
--- until we find the pants executable. The path from where pants lives
--- to where we were invoked tells us the default target to use. We can
--- also do some translation of goals and targets. At the moment this
--- is just to translate the goal 'clean-all' to 'clean' (less typing)
--- and to rewrite the path when the goal is 'test' to be under the
--- tests hierarchy rather than src. (This latter maneuver depends on
--- knowing file structure of the repo.)
-
 invoke :: Invocation -> IO ()
 invoke (Invocation goal target pants) = do
   here <- getCurrentDirectory
@@ -77,5 +68,7 @@ computeTarget "test" path target = [ fullTarget (testPath path) target ]
 computeTarget _ path target      = [ fullTarget path target ]
 
 fullTarget p t = fromMaybe p $ (\s -> p ++ ":" ++ s) <$> t
+
+-- Could be better: assumes a particular repo layout.
 
 testPath p = if "src/" `isPrefixOf` p then "tests/" ++ drop (length "src/") p else p

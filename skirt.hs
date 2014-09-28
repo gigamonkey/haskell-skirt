@@ -30,7 +30,6 @@ opts       = info (helper <*> invocation) (fullDesc <> progDesc description <> h
 
 main = execParser opts >>= invoke
 
-invoke :: Invocation -> IO ()
 invoke (Invocation goal target pants) = do
   here <- getCurrentDirectory
   root <- findRoot here pants

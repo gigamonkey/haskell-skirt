@@ -1,7 +1,10 @@
+import Data.List
+import Data.Maybe
 import Options.Applicative
 import System.Directory
 import System.Exit
 import System.FilePath
+import System.Process
 
 data Invocation = Invocation String (Maybe String) String
 
@@ -10,8 +13,14 @@ data Invocation = Invocation String (Maybe String) String
 tldr = "skirt - a wrapper around pants"
 
 description = unlines [
-  "A wrapper around pants (or a way to circumvent using pants directly)",
-  "that provides a better user interface over the same slow and buggy code."]
+  "A wrapper around pants that takes care of invoking pants from the root ",
+  "of the repo with the target pointing back to the current working ",
+  "directory. It also does some rewriting of goals (you can say 'clean' ",
+  "instead of 'clean-all') and when you invoke the 'test' goal from a ",
+  "src/... directory, points the target at the tests directory ",
+  "corresponding to your current directory. If you don't like the wrapper ",
+  "pun, you can also think of it as a way to skirt around using pants ",
+  "directly. "]
 
 invocation = Invocation <$> goal <*> optional target <*> pants
 goal       = argument str (metavar "GOAL" <> help "The pants goal" <> value "compile" <> showDefault)
@@ -23,22 +32,26 @@ main = execParser opts >>= invoke
 
 -- Basic deal is we walk up from the directory where skirt was invoked
 -- until we find the pants executable. The path from where pants lives
--- to where we were invoked tells us the default target to use.
+-- to where we were invoked tells us the default target to use. We can
+-- also do some translation of goals and targets. At the moment this
+-- is just to translate the goal 'clean-all' to 'clean' (less typing)
+-- and to rewrite the path when the goal is 'test' to be under the
+-- tests hierarchy rather than src. (This latter maneuver depends on
+-- knowing file structure of the repo.)
 
 invoke :: Invocation -> IO ()
 invoke (Invocation goal target pants) = do
   here <- getCurrentDirectory
   root <- findRoot (dirs here) pants
-  doIt root here
-      where doIt Nothing _ = do
-	      putStrLn "No pants! Better hope this is a bad dream."
-	      exitFailure
-
-	    doIt (Just r) h = do
-	      -- TODO: obviously at some point this will exec pants instead of just the command.
-	      setCurrentDirectory r
-	      putStrLn $ pantsCommand pants goal target (pathToHere r h)
-	      exitSuccess
+  runPants root here
+      where
+	runPants Nothing _ = do
+	  putStrLn "No pants! Better hope this is a bad dream."
+	  exitFailure
+	runPants (Just root) here = do
+	  setCurrentDirectory root
+	  code <- rawSystem "./pants" ("goal" : translate goal : computeTarget goal (pathToHere root here) target)
+	  exitWith code
 
 -- Filename manipulations
 
@@ -53,7 +66,14 @@ dirs d = if up == d then [d] else d : dirs up where up = takeDirectory d
 
 -- Pants command computation
 
-pantsCommand pants goal target path = "./" ++ pants ++ " goal " ++ goal ++ " " ++ fullTarget target path
+computeTarget "clean" _ _        = []
+computeTarget "test" path target = [ testPath path ++ fullTarget target ]
+computeTarget _ path target      = [ path ++ fullTarget target ]
 
-fullTarget (Just t) path = path ++ ":" ++ t
-fullTarget Nothing path  = path
+fullTarget t = fromMaybe "" $ (\s -> ":" ++ s) <$> t
+testPath p = if isPrefixOf "src/" p then "tests/" ++ drop (length "src/") p else p
+
+-- We translate certain goals from their pants name to something nicer.
+
+translate "clean" = "clean-all"
+translate x = x

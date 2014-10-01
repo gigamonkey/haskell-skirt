@@ -18,5 +18,8 @@ clean: tidy
 tidy:
 	rm -f *~
 
+publish: skirt
+	cp skirt ~/bin/
+
 %: %.hs
 	ghc $(GHC_OPTS) $<

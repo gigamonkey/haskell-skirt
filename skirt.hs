@@ -36,15 +36,16 @@ invoke (Invocation goal target pants) = do
   runPants root here
     where
       runPants Nothing _ = do
-	putStrLn "No pants! People are pointing and laughing. Maybe it's a bad dream."
-	exitFailure
+        putStrLn "No pants! People are pointing and laughing. Maybe it's a bad dream."
+        exitFailure
 
       runPants (Just root) here = do
-	setCurrentDirectory root
-	rawSystem command args >>= exitWith
-	  where
-	    command = "./" ++ pants
-	    args    = "goal" : translate goal : computeTarget goal (makeRelative root here) target
+        setCurrentDirectory root
+        putStrLn $ intercalate " " (command : args)
+        rawSystem command args >>= exitWith
+          where
+            command = "./" ++ pants
+            args    = "goal" : translate goal : computeTarget goal (makeRelative root here) target
 
 -- Filename manipulations
 
@@ -62,9 +63,15 @@ translate g = g
 
 -- Pants command computation
 
-computeTarget "clean" _ _        = []
-computeTarget "test" path target = [ fullTarget (testPath path) target ]
-computeTarget _ path target      = [ fullTarget path target ]
+computeTarget "clean" _ _        = [] ++ extraArgs "clean"
+computeTarget "test" path target = [ fullTarget (testPath path) target ] ++ extraArgs "test"
+computeTarget x path target      = [ fullTarget path target ] ++ extraArgs x
+
+java7compile = ["--compile-javac-args=-source", "--compile-javac-args=7", "--compile-javac-args=-target", "--compile-javac-args=7"]
+
+extraArgs "clean" = []
+extraArgs "test"  = extraArgs "compile" ++ ["--no-test-junit-suppress-output"]
+extraArgs _       = java7compile
 
 fullTarget p t = fromMaybe p $ (\s -> p ++ ":" ++ s) <$> t
 

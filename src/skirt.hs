@@ -15,7 +15,7 @@ tldr = "skirt - a wrapper around pants"
 description = unlines [
   "A wrapper around pants that takes care of invoking pants from the root ",
   "of the repo with the target pointing back to the current working ",
-  "directory. It also does some rewriting of goals (you can say 'clean' ",
+  "directory. It also does some minor rewriting of goals (you can say 'clean' ",
   "instead of 'clean-all') and when you invoke the 'test' goal from a ",
   "src/... directory, points the target at the tests directory ",
   "corresponding to your current directory. If you don't like the wrapper ",
@@ -50,7 +50,7 @@ invoke (Invocation goal target pants) = do
 
 -- Filename manipulations
 
-findRoot here f = firstM (\d -> doesFileExist $ combine d f) (dirs here)
+findRoot here f = firstM (doesFileExist . (</> f)) (dirs here)
 
 firstM _ [] = return Nothing
 firstM p (d:ds) = p d >>= \b -> if b then return (Just d) else firstM p ds

@@ -77,7 +77,7 @@ extraArgs "clean" = []
 extraArgs "test"  = extraArgs "compile" ++ ["--no-test-junit-suppress-output"]
 extraArgs _       = java7compile
 
-fullTarget p t = fromMaybe p $ ((p ++ ":") ++) <$> t
+fullTarget p t = p ++ fromMaybe "" ((":"++) <$> t)
 
 -- Could be better: assumes a particular repo layout.
 

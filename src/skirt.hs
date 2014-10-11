@@ -41,11 +41,12 @@ invoke (Invocation goal target pants) = do
 
       runPants (Just root) here = do
         setCurrentDirectory root
-        putStrLn $ intercalate " " (command : args)
+        putStrLn $ unwords (command : args)
         rawSystem command args >>= exitWith
           where
-            command = "./" ++ pants
-            args    = "goal" : translate goal : computeTarget goal (makeRelative root here) target
+            command    = "./" ++ pants
+            path       = makeRelative root here
+            args       = "goal" : translate goal : targetFor goal path target ++ extraArgs goal
 
 -- Filename manipulations
 
@@ -59,21 +60,24 @@ dirs d = if up == d then [d] else d : dirs up where up = takeDirectory d
 -- We translate certain goals from their pants name to something nicer.
 
 translate "clean" = "clean-all"
-translate g = g
+translate goal    = goal
 
 -- Pants command computation
 
-computeTarget "clean" _ _        = [] ++ extraArgs "clean"
-computeTarget "test" path target = [ fullTarget (testPath path) target ] ++ extraArgs "test"
-computeTarget x path target      = [ fullTarget path target ] ++ extraArgs x
-
+-- some hardwired jank for the moment.
 java7compile = ["--compile-javac-args=-source", "--compile-javac-args=7", "--compile-javac-args=-target", "--compile-javac-args=7"]
+
+targetFor "clean" _ _      = []
+targetFor goal path target = [fullTarget (translatePath goal path) target]
+
+translatePath "test" = testPath
+translatePath _      = id
 
 extraArgs "clean" = []
 extraArgs "test"  = extraArgs "compile" ++ ["--no-test-junit-suppress-output"]
 extraArgs _       = java7compile
 
-fullTarget p t = fromMaybe p $ (\s -> p ++ ":" ++ s) <$> t
+fullTarget p t = fromMaybe p $ ((p ++ ":") ++) <$> t
 
 -- Could be better: assumes a particular repo layout.
 
